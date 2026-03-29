@@ -277,6 +277,44 @@ npm run build
 clarinet deploy --testnet
 ```
 
+### Backend Deployment (EC2 + DynamoDB, no IAM role)
+This project already contains a backend in `backend/` that talks to DynamoDB via AWS SDK.
+If IAM roles are not available on your student account, use access keys in environment variables instead.
+
+1. **Create or verify the DynamoDB table**
+   - Table name: `OffchainProducts` (or set `DYNAMODB_TABLE_NAME`)
+   - Partition key: `blockchainId` (String)
+
+2. **Copy backend env vars**
+   ```bash
+   cd backend
+   cp .env.example .env
+   ```
+   Edit `backend/.env` with your region and, if needed, access keys:
+   ```env
+   AWS_REGION=us-east-1
+   DYNAMODB_TABLE_NAME=OffchainProducts
+   AWS_ACCESS_KEY_ID=YOUR_ACCESS_KEY_ID
+   AWS_SECRET_ACCESS_KEY=YOUR_SECRET_ACCESS_KEY
+   AWS_SESSION_TOKEN=YOUR_SESSION_TOKEN
+   PORT=3000
+   ```
+   Do not commit real keys.
+
+3. **Build and start the backend**
+   ```bash
+   npm install
+   npm run build
+   npm start
+   ```
+
+4. **Keep it running without PM2 (optional)**
+   If you want it to survive SSH disconnects without PM2/systemd:
+   ```bash
+   nohup npm start > server.log 2>&1 &
+   ```
+   Stop it with `pkill -f "node dist/server.js"` and check logs in `server.log`.
+
 ## 🤝 Contributing
 
 We welcome contributions! Please see our [Contributing Guidelines](CONTRIBUTING.md) for details.
