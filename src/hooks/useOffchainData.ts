@@ -8,6 +8,10 @@ export interface OffchainProductData {
   ipfsHash?: string;
   highResImageUrl?: string;
   owner?: string;
+  batchId?: string;
+  location?: string;
+  currentStage?: string;
+  lastTxId?: string;
   createdAt?: string;
 }
 

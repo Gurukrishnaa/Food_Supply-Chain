@@ -5,107 +5,117 @@ import {
 } from '@stacks/connect';
 import {
   uintCV,
-  stringAsciiCV,
-  principalCV,
-  AnchorMode,
-  PostConditionMode
+  stringAsciiCV
 } from '@stacks/transactions';
+import * as stacksNetwork from '@stacks/network';
 
 const appConfig = new AppConfig(['store_write', 'publish_data']);
 const userSession = new UserSession({ appConfig });
+const network = stacksNetwork.createNetwork('testnet');
 
 // Contract details
 const CONTRACT_ADDRESS = 'STW42W7AEKZ2EFYH834C6DW9272JHT1PHM92FY88';
 const CONTRACT_NAME = 'supply-chain';
 
-export const createBatch = async (product: string): Promise<string> => {
+function openContractCallForTxId(options: Parameters<typeof openContractCall>[0]): Promise<string> {
+  return new Promise((resolve, reject) => {
+    try {
+      const result = openContractCall({
+        ...options,
+        onFinish: (data) => {
+          options.onFinish?.(data);
+          resolve(data.txId);
+        },
+        onCancel: () => {
+          options.onCancel?.();
+          reject(new Error('Transaction cancelled'));
+        },
+      });
+
+      // Some versions return `void` (no promise). Guard before attaching handlers.
+      const maybePromise = result as unknown;
+      if (typeof maybePromise === 'object' && maybePromise !== null && typeof (maybePromise as any).catch === 'function') {
+        (maybePromise as any).catch(reject);
+      }
+    } catch (err) {
+      reject(err);
+    }
+  });
+}
+
+export const createProduct = async (params: {
+  productId: string;
+  batchId: string;
+  harvestDate: number;
+  location: string;
+}): Promise<string> => {
   if (!userSession.isUserSignedIn()) {
     throw new Error('User not signed in');
   }
 
-  try {
-    await openContractCall({
-      contractAddress: CONTRACT_ADDRESS,
-      contractName: CONTRACT_NAME,
-      functionName: 'create-batch',
-      functionArgs: [stringAsciiCV(product)],
-      network: 'testnet',
-      onFinish: (data) => {
-        console.log('Batch created. Transaction ID:', data.txId);
-        return data.txId;
-      },
-      onCancel: () => {
-        throw new Error('Transaction cancelled');
-      },
-    });
+  const txId = await openContractCallForTxId({
+    contractAddress: CONTRACT_ADDRESS,
+    contractName: CONTRACT_NAME,
+    functionName: 'create-product',
+    functionArgs: [
+      stringAsciiCV(params.productId),
+      stringAsciiCV(params.batchId),
+      uintCV(params.harvestDate),
+      stringAsciiCV(params.location),
+    ],
+    network,
+    onFinish: (data) => console.log('Product created. Transaction ID:', data.txId),
+  });
 
-    return 'Batch creation initiated';
-  } catch (error) {
-    console.error('Error creating batch:', error);
-    throw error;
-  }
+  return txId;
 };
 
-export const transferBatch = async (batchId: number, newOwner: string): Promise<string> => {
+export const addCheckpoint = async (params: {
+  productId: string;
+  stage: string;
+  data: string;
+}): Promise<string> => {
   if (!userSession.isUserSignedIn()) {
     throw new Error('User not signed in');
   }
 
-  try {
-    await openContractCall({
-      contractAddress: CONTRACT_ADDRESS,
-      contractName: CONTRACT_NAME,
-      functionName: 'transfer-batch',
-      functionArgs: [
-        uintCV(batchId),
-        principalCV(newOwner)
-      ],
-      network: 'testnet',
-      onFinish: (data) => {
-        console.log('Batch transferred. Transaction ID:', data.txId);
-        return data.txId;
-      },
-      onCancel: () => {
-        throw new Error('Transaction cancelled');
-      },
-    });
+  const txId = await openContractCallForTxId({
+    contractAddress: CONTRACT_ADDRESS,
+    contractName: CONTRACT_NAME,
+    functionName: 'add-checkpoint',
+    functionArgs: [
+      stringAsciiCV(params.productId),
+      stringAsciiCV(params.stage),
+      stringAsciiCV(params.data),
+    ],
+    network,
+    onFinish: (data) => console.log('Checkpoint added. Transaction ID:', data.txId),
+  });
 
-    return 'Batch transfer initiated';
-  } catch (error) {
-    console.error('Error transferring batch:', error);
-    throw error;
-  }
+  return txId;
 };
 
-export const assignRole = async (userAddress: string, role: string): Promise<string> => {
+export const verifyCheckpoint = async (params: {
+  productId: string;
+  checkpointId: number;
+}): Promise<string> => {
   if (!userSession.isUserSignedIn()) {
     throw new Error('User not signed in');
   }
 
-  try {
-    await openContractCall({
-      contractAddress: CONTRACT_ADDRESS,
-      contractName: CONTRACT_NAME,
-      functionName: 'assign-role',
-      functionArgs: [
-        principalCV(userAddress),
-        stringAsciiCV(role)
-      ],
-      network: 'testnet',
-      onFinish: (data) => {
-        console.log('Role assigned. Transaction ID:', data.txId);
-        return data.txId;
-      },
-      onCancel: () => {
-        throw new Error('Transaction cancelled');
-      },
-    });
+  const txId = await openContractCallForTxId({
+    contractAddress: CONTRACT_ADDRESS,
+    contractName: CONTRACT_NAME,
+    functionName: 'verify-checkpoint',
+    functionArgs: [
+      stringAsciiCV(params.productId),
+      uintCV(params.checkpointId),
+    ],
+    network,
+    onFinish: (data) => console.log('Checkpoint verification submitted. Transaction ID:', data.txId),
+  });
 
-    return 'Role assignment initiated';
-  } catch (error) {
-    console.error('Error assigning role:', error);
-    throw error;
-  }
+  return txId;
 };
 
 export const getBatchFromStacks = async (batchId: number) => {

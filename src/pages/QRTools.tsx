@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import ProductQRGenerator from '@/components/ProductQRGenerator';
 import QRScannerComponent from '@/components/QRScanner';
 import { useWallet } from '@/hooks/useWallet';
+import { useOffchainData } from '@/hooks/useOffchainData';
 import { recordProductOnBlockchain, createProductRecord, SupplyChainProduct } from '@/utils/blockchain';
 import { toast } from 'sonner';
 import { QrCode, Scan, Package, AlertCircle } from 'lucide-react';
@@ -12,6 +13,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 
 const QRTools = () => {
   const { address, isConnected, walletType } = useWallet();
+  const { saveProduct } = useOffchainData();
   const [isRecording, setIsRecording] = useState(false);
 
   const handleQRGenerate = async (qrData: string) => {
@@ -35,6 +37,22 @@ const QRTools = () => {
 
       const txHash = await recordProductOnBlockchain(product, address);
       toast.success(`Product recorded on ${walletType} blockchain! TX: ${txHash.slice(0, 10)}...`);
+
+      // Store off-chain metadata in DynamoDB (via the EC2 backend), keyed by the blockchain product ID.
+      // QR payload currently includes id/name only; extra fields are accepted if you later extend QR payload.
+      try {
+        await saveProduct({
+          blockchainId: product.id,
+          name: product.name,
+          ipfsHash: parsedData.ipfsHash,
+          highResImageUrl: parsedData.highResImageUrl,
+          owner: address,
+        });
+        toast.success('Saved off-chain metadata to DynamoDB');
+      } catch (err) {
+        console.error('Off-chain save error:', err);
+        toast.error('Recorded on blockchain, but failed to save to DynamoDB');
+      }
     } catch (error) {
       toast.error('Failed to record product on blockchain');
       console.error('Blockchain recording error:', error);

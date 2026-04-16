@@ -6,13 +6,16 @@ import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { ArrowLeft, Package, MapPin, Clock, User, Hash, ExternalLink } from 'lucide-react';
 import { getProductFromBlockchain, SupplyChainProduct } from '@/utils/blockchain';
+import { OffchainProductData, useOffchainData } from '@/hooks/useOffchainData';
 import { toast } from 'sonner';
 
 const TrackProduct = () => {
   const { productId } = useParams<{ productId: string }>();
   const [product, setProduct] = useState<SupplyChainProduct | null>(null);
+  const [offchain, setOffchain] = useState<OffchainProductData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>('');
+  const { getProduct } = useOffchainData();
 
   useEffect(() => {
     if (productId) {
@@ -23,11 +26,20 @@ const TrackProduct = () => {
   const loadProduct = async (id: string) => {
     setLoading(true);
     setError('');
+    setOffchain(null);
     
     try {
       const productData = await getProductFromBlockchain(id);
       if (productData) {
         setProduct(productData);
+
+        // Fetch off-chain metadata from DynamoDB (via EC2 backend). If not found, ignore.
+        try {
+          const offchainData = await getProduct(id);
+          setOffchain(offchainData);
+        } catch (err) {
+          console.error('Off-chain fetch error:', err);
+        }
       } else {
         setError('Product not found');
       }
@@ -174,6 +186,77 @@ const TrackProduct = () => {
                       <ExternalLink className="h-4 w-4" />
                       View
                     </Button>
+                  </div>
+                </div>
+              )}
+
+              {offchain && (
+                <div className="pt-4 border-t space-y-4">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-muted-foreground">Off-chain Metadata (DynamoDB)</label>
+                    <div className="p-3 bg-muted rounded-lg space-y-2">
+                      {offchain.name && (
+                        <div className="flex items-center justify-between gap-3">
+                          <span className="text-sm text-muted-foreground">Name</span>
+                          <span className="text-sm">{offchain.name}</span>
+                        </div>
+                      )}
+                      {offchain.batchId && (
+                        <div className="flex items-center justify-between gap-3">
+                          <span className="text-sm text-muted-foreground">Batch ID</span>
+                          <span className="font-mono text-sm truncate">{offchain.batchId}</span>
+                        </div>
+                      )}
+                      {offchain.location && (
+                        <div className="flex items-center justify-between gap-3">
+                          <span className="text-sm text-muted-foreground">Location</span>
+                          <span className="text-sm">{offchain.location}</span>
+                        </div>
+                      )}
+                      {offchain.currentStage && (
+                        <div className="flex items-center justify-between gap-3">
+                          <span className="text-sm text-muted-foreground">Stage</span>
+                          <span className="text-sm">{offchain.currentStage}</span>
+                        </div>
+                      )}
+                      {offchain.owner && (
+                        <div className="flex items-center justify-between gap-3">
+                          <span className="text-sm text-muted-foreground">Owner</span>
+                          <span className="font-mono text-sm truncate">{offchain.owner}</span>
+                        </div>
+                      )}
+                      {offchain.lastTxId && (
+                        <div className="flex items-center justify-between gap-3">
+                          <span className="text-sm text-muted-foreground">Last TX</span>
+                          <span className="font-mono text-sm truncate">{offchain.lastTxId}</span>
+                        </div>
+                      )}
+                      {offchain.ipfsHash && (
+                        <div className="flex items-center justify-between gap-3">
+                          <span className="text-sm text-muted-foreground">IPFS Hash</span>
+                          <span className="font-mono text-sm truncate">{offchain.ipfsHash}</span>
+                        </div>
+                      )}
+                      {offchain.highResImageUrl && (
+                        <div className="flex items-center justify-between gap-3">
+                          <span className="text-sm text-muted-foreground">Image URL</span>
+                          <a
+                            className="text-sm text-primary hover:underline truncate"
+                            href={offchain.highResImageUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                          >
+                            {offchain.highResImageUrl}
+                          </a>
+                        </div>
+                      )}
+                      {offchain.createdAt && (
+                        <div className="flex items-center justify-between gap-3">
+                          <span className="text-sm text-muted-foreground">Saved At</span>
+                          <span className="text-sm">{new Date(offchain.createdAt).toLocaleString()}</span>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
               )}

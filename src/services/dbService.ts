@@ -5,51 +5,58 @@ import api from '../lib/api';
  * talks to DynamoDB.
  */
 
-// Example generic type for the data you expect from DynamoDB
-export interface SupplyChainItem {
-  id: string;
-  name: string;
-  status: string;
+// DynamoDB item shape used by the backend `/api/products` routes.
+export interface OffchainProductItem {
+  blockchainId: string;
+  name?: string;
+  owner?: string;
+  batchId?: string;
+  location?: string;
+  currentStage?: string;
+  ipfsHash?: string;
+  highResImageUrl?: string;
+  lastTxId?: string;
   createdAt?: string;
+  updatedAt?: string;
 }
 
 export const dbService = {
   /**
-   * Fetch all items from the EC2 backend
+   * Fetch all products from the EC2 backend
    */
-  async getItems(): Promise<SupplyChainItem[]> {
-    const response = await api.get('/items');
+  async getProducts(): Promise<OffchainProductItem[]> {
+    const response = await api.get('/products');
     return response.data;
   },
 
   /**
-   * Fetch a single item by ID
+   * Fetch a single product by blockchainId
    */
-  async getItemById(id: string): Promise<SupplyChainItem> {
-    const response = await api.get(`/items/${id}`);
+  async getProductById(blockchainId: string): Promise<OffchainProductItem> {
+    const response = await api.get(`/products/${blockchainId}`);
     return response.data;
   },
 
   /**
-   * Create a new item
+   * Create a new product (upsert)
    */
-  async createItem(itemData: Omit<SupplyChainItem, 'id'>): Promise<SupplyChainItem> {
-    const response = await api.post('/items', itemData);
+  async createProduct(itemData: Omit<OffchainProductItem, 'createdAt' | 'updatedAt'>): Promise<OffchainProductItem> {
+    const response = await api.post('/products', itemData);
     return response.data;
   },
 
   /**
-   * Update an existing item
+   * Update an existing product
    */
-  async updateItem(id: string, updates: Partial<SupplyChainItem>): Promise<SupplyChainItem> {
-    const response = await api.put(`/items/${id}`, updates);
+  async updateProduct(blockchainId: string, updates: Partial<OffchainProductItem>): Promise<OffchainProductItem> {
+    const response = await api.put(`/products/${blockchainId}`, updates);
     return response.data;
   },
 
   /**
-   * Delete an item
+   * Delete a product
    */
-  async deleteItem(id: string): Promise<void> {
-    await api.delete(`/items/${id}`);
+  async deleteProduct(blockchainId: string): Promise<void> {
+    await api.delete(`/products/${blockchainId}`);
   }
 };
